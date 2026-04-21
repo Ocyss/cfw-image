@@ -3,12 +3,19 @@ export default {
         const url = new URL(request.url);
         if (url.pathname.startsWith("/get/")) {
             const key = url.pathname.replace("/get/", "");
-            const record = await env.DB.prepare("SELECT * FROM images WHERE key = ?").bind(key).first();
+            const record = await env.DB.prepare(
+                "SELECT * FROM images WHERE key = ?",
+            )
+                .bind(key)
+                .first();
             const object = await env.R2.get(key);
 
             if (object) {
                 return new Response(object.body, {
-                    headers: { "Content-Type": object.httpMetadata?.contentType || "image/jpeg" }
+                    headers: {
+                        "Content-Type":
+                            object.httpMetadata?.contentType || "image/jpeg",
+                    },
                 });
             }
 
@@ -17,7 +24,7 @@ export default {
             }
             return new Response("Not Found", { status: 404 });
         }
-        const authHeader = request.headers.get("Authorization");
+        const authHeader = request.headers.get("Authorization")?.slice(7);
         if (authHeader !== env.AUTH_SECRET) {
             return new Response("Unauthorized", { status: 401 });
         }
@@ -29,19 +36,36 @@ export default {
                 const month = String(now.getMonth() + 1).padStart(2, "0");
                 const day = String(now.getDate()).padStart(2, "0");
                 const key = `${tag}/${year}/${month}/${day}/${crypto.randomUUID()}.jpg`;
-                await env.DB.prepare("INSERT INTO images (key, original_url, status) VALUES (?, ?, 'pending')")
-                    .bind(key, targetUrl).run();
+                await env.DB.prepare(
+                    "INSERT INTO images (key, original_url, status) VALUES (?, ?, 'pending')",
+                )
+                    .bind(key, targetUrl)
+                    .run();
 
                 ctx.waitUntil(this.handleDownload(key, targetUrl, env));
 
-                return new Response(JSON.stringify({
-                    key,
-                    cdnUrl: `${url.origin}/get/${key}`
-                }), {
-                    headers: { "Content-Type": "application/json" }
-                });
+                return new Response(
+                    JSON.stringify({
+                        key,
+                        cdnUrl: `${url.origin}/get/${key}`,
+                    }),
+                    {
+                        headers: { "Content-Type": "application/json" },
+                    },
+                );
             } catch (e) {
-                return new Response("Invalid Request", { status: 400 });
+                return new Response(
+                    JSON.stringify({
+                        error: "Invalid Request",
+                        message: e.message,
+                        stack: e.stack,
+                        detail: String(e),
+                    }),
+                    {
+                        status: 400,
+                        headers: { "Content-Type": "application/json" },
+                    },
+                );
             }
         }
 
@@ -51,15 +75,29 @@ export default {
     async handleDownload(key, targetUrl, env) {
         try {
             const resp = await fetch(targetUrl, {
-                headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+                headers: {
+                    "User-Agent":
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                },
             });
             if (!resp.ok) throw new Error();
             await env.R2.put(key, resp.body, {
-                httpMetadata: { contentType: resp.headers.get("Content-Type") || "image/jpeg" }
+                httpMetadata: {
+                    contentType:
+                        resp.headers.get("Content-Type") || "image/jpeg",
+                },
             });
-            await env.DB.prepare("UPDATE images SET status = 'success' WHERE key = ?").bind(key).run();
+            await env.DB.prepare(
+                "UPDATE images SET status = 'success' WHERE key = ?",
+            )
+                .bind(key)
+                .run();
         } catch (e) {
-            await env.DB.prepare("UPDATE images SET status = 'failed' WHERE key = ?").bind(key).run();
+            await env.DB.prepare(
+                "UPDATE images SET status = 'failed' WHERE key = ?",
+            )
+                .bind(key)
+                .run();
         }
-    }
+    },
 };
