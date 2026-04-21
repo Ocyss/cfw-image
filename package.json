@@ -1,5 +1,0 @@
-{
-    "scripts": {
-        "deploy": "wrangler deploy && wrangler d1 migrations apply cfw-image --remote --yes"
-    }
-}
