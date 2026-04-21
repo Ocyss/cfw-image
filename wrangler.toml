@@ -2,8 +2,6 @@ name = "cfw-image-worker"
 main = "cfw_image.js"
 compatibility_date = "2026-04-21"
 
-migrations_dir = "migrations"
-
 [[r2_buckets]]
 binding = "R2"
 bucket_name = "cfw-image"
@@ -11,3 +9,4 @@ bucket_name = "cfw-image"
 [[d1_databases]]
 binding = "DB"
 database_name = "cfw-image"
+migrations_dir = "migrations"
